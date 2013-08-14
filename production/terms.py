@@ -1,5 +1,8 @@
 import re
 
+from utils import ReversibleIterator
+
+
 LAMBDA = 'lambda'
 IF0 = 'if0'
 FOLD = 'fold'
@@ -136,3 +139,42 @@ def subst(t, replacements={}):
         return tuple(
             subst(tt, replacements) for tt in t)
     return t
+
+
+tokenizer_rx = re.compile(r'\s* ([()] | \b \w+ \b) \s*', re.VERBOSE)
+identifier_rx = re.compile(r'^[a-z][a-z_0-9]*$', re.VERBOSE)
+
+def tokenize(s):
+    res = []
+    prev_end = 0
+    for m in tokenizer_rx.finditer(s):
+        assert m.start() == prev_end, 'Invalid token at %d: %r' % (prev_end, s[prev_end:m.start()])
+        prev_end = m.end()
+        yield m.group(1), m.start()
+
+
+def parse_term(s):
+    tokens = ReversibleIterator(iter(tokenize(s)))
+
+    def parse():
+        token, pos = next(tokens)
+        if token == '(':
+            elems = []
+            while True:
+                token, pos = next(tokens)
+                if token == ')':
+                    break
+                tokens.unnext((token, pos))
+                elems.append(parse())
+            return tuple(elems)
+        if token in '01':
+            return int(token)
+        else:
+            assert identifier_rx.match(token), (token, pos)
+            return token
+
+    result = parse()
+    tokens = list(tokens)
+    assert len(tokens) == 0, 'Trailing identifiers: %s' % ' '.join(
+        '%r' % tok for tok, _ in tokens)
+    return result
