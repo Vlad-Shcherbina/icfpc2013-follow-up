@@ -74,14 +74,24 @@ def solve(problem, server):
 
 
 if __name__ == '__main__':
+    import json
+    import time
     from communicate import get_training_problem
-    from real_server import Server
+    from local_server import Server
+    from problem import Problem
 
     logging.basicConfig(level=logging.INFO)
-    logger.info('hi')
 
-    problem = get_training_problem(10, operators=[])
+    with open('../data/easy_benchmark.json') as fin:
+        items = json.load(fin)
 
-    server = Server([problem])
+    start = time.clock()
+    for i, item in enumerate(items):
+        logging.info('-------- {}/{} ---------'.format(i, len(items)))
+        problem = Problem.from_json(item['problem'])
+        problem.solution = item['solution']
+        server = Server([problem])
 
-    solve(problem, server)
+        solve(problem, server)
+
+    print 'it took', time.clock() - start
