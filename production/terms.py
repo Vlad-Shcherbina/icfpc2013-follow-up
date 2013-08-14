@@ -127,3 +127,12 @@ def term_op(t):
                 result |= term_op(tt)
             return result
     return set()
+
+
+def subst(t, replacements={}):
+    if t in replacements:
+        return replacements[t]
+    if isinstance(t, tuple):
+        return tuple(
+            subst(tt, replacements) for tt in t)
+    return t
