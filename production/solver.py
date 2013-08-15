@@ -2,7 +2,8 @@ import itertools
 from random import randrange
 
 from terms import *
-from enum import Enum
+from enum import Enum, Constraint
+import stats
 
 import logging
 logger = logging.getLogger(__name__)
@@ -43,8 +44,6 @@ def solve(problem, server):
     assert 'tfold' not in problem.operators
 
     e = Enum(problem.operators)
-    candidates = itertools.chain(
-        *(e.base_enum(size) for size in range(1, problem.size)))
 
     known_values = {}
     while True:
@@ -53,14 +52,21 @@ def solve(problem, server):
         ys = server.request_eval(problem, xs)
         known_values.update(zip(xs, ys))
 
-        for candidate in candidates:
-            for x, y in known_values.items():
-                if evaluate(candidate, dict(x=x)) != y:
+        with stats.TimeIt('search for candidate'):
+            constraints = [
+                Constraint.create_precise(x, y)
+                for x, y in known_values.items()[:10]]
+            candidates = itertools.chain(
+                *(e.base_enum(size, constraints=constraints)
+                  for size in range(1, problem.size)))
+            for candidate in candidates:
+                for x, y in known_values.items():
+                    if evaluate(candidate, dict(x=x)) != y:
+                        break
+                else:
                     break
             else:
-                break
-        else:
-            assert False, 'no candidates fit known values'
+                assert False, 'no candidates fit known values'
 
         logging.info('trying candidate {}'.format(term_to_str(candidate)))
         program = '(lambda (x) {})'.format(term_to_str(candidate))
@@ -93,5 +99,7 @@ if __name__ == '__main__':
         server = Server([problem])
 
         solve(problem, server)
+
+        stats.log_stats()
 
     print 'it took', time.clock() - start
