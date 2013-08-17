@@ -18,6 +18,24 @@ class SemanticDict(object):
         self.solver = z3.Solver()
         self.root = None
 
+    def iter_nodes(self):
+        def rec(node):
+            if node.children is None:
+                yield node
+            else:
+                for c in node.children.values():
+                    for n in rec(c):
+                        yield n
+        if self.root is not None:
+            for n in rec(self.root):
+                yield n
+
+    def __len__(self):
+        return sum(1 for _ in self.iter_nodes())
+
+    def itervalues(self):
+        return (node.value for node in self.iter_nodes())
+
     def find_or_add(self, z3t, value_constructor):
         if self.root is None:
             self.root = Node()

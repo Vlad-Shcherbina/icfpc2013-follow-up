@@ -5,6 +5,9 @@ from terms import *
 
 zero56 = z3.BitVecVal(0, 56)
 
+# for convenience
+default_env = {v:z3.BitVec(v, 64) for v in 'xyz'}
+
 def term_to_z3(t, env={}):
     if isinstance(t, (int, long)):
         return z3.BitVecVal(t, 64)
