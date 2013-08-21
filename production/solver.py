@@ -2,7 +2,7 @@ import itertools
 from random import randrange
 
 from terms import *
-from enum import Enum, Constraint
+from enum import EnumUnique, Constraint
 import stats
 
 import logging
@@ -43,7 +43,8 @@ def solve(problem, server):
     assert 'fold' not in problem.operators
     assert 'tfold' not in problem.operators
 
-    e = Enum(problem.operators)
+    e = EnumUnique(problem.operators)
+    e.precompute_unique(3)
 
     known_values = {}
     while True:
@@ -55,14 +56,14 @@ def solve(problem, server):
         with stats.TimeIt('search for candidate'):
             constraints = [
                 Constraint.create_precise(x, y)
-                for x, y in known_values.items()[:10]]
+                for x, y in known_values.items()]
             candidates = itertools.chain(
                 *(e.base_enum(size, constraints=constraints)
                   for size in range(1, problem.size)))
             for candidate in candidates:
                 for x, y in known_values.items():
                     if evaluate(candidate, dict(x=x)) != y:
-                        break
+                        assert False, ('constraints not satisfied by enum', candidate)
                 else:
                     break
             else:
@@ -92,10 +93,13 @@ if __name__ == '__main__':
         items = json.load(fin)
 
     start = time.clock()
+
     for i, item in enumerate(items):
         logging.info('-------- {}/{} ---------'.format(i, len(items)))
         problem = Problem.from_json(item['problem'])
         problem.solution = item['solution']
+        logging.info(str(problem))
+
         server = Server([problem])
 
         solve(problem, server)

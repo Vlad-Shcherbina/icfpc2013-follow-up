@@ -1,6 +1,8 @@
 from terms import *
 from constraints import Constraint, filter_with_constraint
 from constraints import propagate_unary, propagate_binary1, propagate_binary2
+from semantic_dict import SemanticDict
+from z3_utils import term_to_z3, default_env
 import stats
 
 import logging
@@ -90,8 +92,38 @@ class Enum(object):
         return self.base_enum(size)
 
 
+class EnumUnique(Enum):
+    def __init__(self, operators):
+        super(EnumUnique, self).__init__(operators)
+
+    def precompute_unique(self, size):
+        self.unique = []
+        d = SemanticDict()
+        for i in range(size+1):
+            u = []
+            for t in self.base_enum(i):
+                zt = term_to_z3(t, default_env)
+                def add_to_u():
+                    u.append(t)
+                    return t
+                d.find_or_add(zt, add_to_u)
+            self.unique.append(u)
+            logger.info('{} unique terms of size {}'.format(len(self.unique[i]), i))
+
+    def base_enum(self, size, constraints=[]):
+        if size < 0:
+            return []
+        if size < len(self.unique):
+            return filter_with_constraint(self.unique[size], constraints)
+        return super(EnumUnique, self).base_enum(size, constraints)
+
+
 if __name__ == '__main__':
-    e = Enum(operators=frozenset([PLUS, OR, NOT]))
-    e.leafs = [0, 1]
+    e = EnumUnique(operators=frozenset([PLUS, OR, NOT, XOR, SHL1]))
+    e.leafs = [0, 'x']
+    e.precompute_unique(4)
+    cnt = 0
     for t in e.base_enum(4):
         print t
+        cnt += 1
+    print cnt, 'total'
