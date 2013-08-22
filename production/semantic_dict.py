@@ -2,6 +2,7 @@ from copy import copy
 
 import z3
 import z3_utils
+import stats
 
 
 class Node(object):
@@ -14,7 +15,7 @@ class Node(object):
 
 class SemanticDict(object):
     def __init__(self):
-        self.vars = [z3.BitVec(v, 64) for v in 'xyz']
+        self.vars = ['x', 'y', 'z']
         self.solver = z3.Solver()
         self.root = None
 
@@ -36,26 +37,33 @@ class SemanticDict(object):
     def itervalues(self):
         return (node.value for node in self.iter_nodes())
 
-    def find_or_add(self, z3t, value_constructor):
+    @staticmethod
+    def _make_z3_evaluator(z3t):
+        def evaluator(env):
+            solver = z3.Solver()
+            for k, v in env.items():
+                solver.add(z3.BitVec(k, 64) == v)
+            result = solver.check()
+            assert result == z3.sat
+            model = solver.model()
+            return z3_utils.eval_in_model(model, z3t)
+        return evaluator
+
+    @stats.TimeIt('SemanticDict.find_or_add')
+    def find_or_add(self, z3t, value_constructor, evaluator=None):
         if self.root is None:
             self.root = Node()
             self.root.z3t = z3t
             self.root.value = value_constructor()
             return self.root.value
 
-        def eval_in_model(t):
-            result = model.evaluate(t, model_completion=True)
-            return int(result.as_string())
+        if evaluator is None:
+            evaluator = self._make_z3_evaluator(z3t)
 
         node = self.root
         while node.children is not None:
-            self.solver.reset()
-            for var, val in zip(self.vars, node.vars):
-                self.solver.add(var == val)
-            result = self.solver.check()
-            assert result == z3.sat
-            model = self.solver.model()
-            t = eval_in_model(z3t)
+            env = dict(zip(self.vars, node.vars))
+            t = evaluator(env)
             if t not in node.children:
                 leaf = Node()
                 leaf.z3t = z3t
@@ -66,8 +74,9 @@ class SemanticDict(object):
             node = node.children[t]
 
         self.solver.reset()
-        self.solver.add(node.z3t != z3t)
-        result = self.solver.check()
+        with stats.TimeIt('equivalence check'):
+            self.solver.add(node.z3t != z3t)
+            result = self.solver.check()
         if result == z3.sat:
             model = self.solver.model()
             leaf1 = copy(node)
@@ -76,10 +85,13 @@ class SemanticDict(object):
             leaf2.value = value_constructor()
             node.z3t = node.value = None
 
-            node.vars = [eval_in_model(v) for v in self.vars]
+            node.vars = [
+                z3_utils.eval_in_model(model, z3.BitVec(v, 64))
+                for v in self.vars]
             node.children = {}
-            node.children[eval_in_model(leaf1.z3t)] = leaf1
-            node.children[eval_in_model(leaf2.z3t)] = leaf2
+
+            node.children[z3_utils.eval_in_model(model, leaf1.z3t)] = leaf1
+            node.children[z3_utils.eval_in_model(model, leaf2.z3t)] = leaf2
 
             return leaf2.value
 

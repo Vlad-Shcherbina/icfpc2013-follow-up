@@ -106,7 +106,9 @@ class EnumUnique(Enum):
                 def add_to_u():
                     u.append(t)
                     return t
-                d.find_or_add(zt, add_to_u)
+                def evaluator(env):
+                    return evaluate(t, env)
+                d.find_or_add(zt, add_to_u, evaluator=evaluator)
             self.unique.append(u)
             logger.info('{} unique terms of size {}'.format(len(self.unique[i]), i))
 

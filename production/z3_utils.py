@@ -65,3 +65,8 @@ def term_to_z3(t, env={}):
         return accum
     else:
         assert False, (op, t)
+
+
+def eval_in_model(model, z3t):
+    result = model.evaluate(z3t, model_completion=True)
+    return int(result.as_string())
