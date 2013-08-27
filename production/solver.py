@@ -1,3 +1,4 @@
+import csv
 import itertools
 from random import randrange
 
@@ -89,15 +90,23 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    with open('../data/easy_benchmark.json') as fin:
-        items = json.load(fin)
+    problems = []
+    with open('../data/problems.csv') as fin:
+        reader = csv.reader(fin)
+        next(reader)  # skip header
+        for id, size, ops, solution in reader:
+            size = int(size)
+            ops = frozenset(ops.split())
+            p = Problem(id, size, ops)
+            p.solution = '(lambda (x) {})'.format(solution)
+
+            if size == 8 and 'fold' not in ops and 'tfold' not in ops:
+                problems.append(p)
 
     start = time.clock()
 
-    for i, item in enumerate(items):
-        logging.info('-------- {}/{} ---------'.format(i, len(items)))
-        problem = Problem.from_json(item['problem'])
-        problem.solution = item['solution']
+    for i, problem in enumerate(problems):
+        logging.info('-------- {}/{} ---------'.format(i, len(problems)))
         logging.info(str(problem))
 
         server = Server([problem])
