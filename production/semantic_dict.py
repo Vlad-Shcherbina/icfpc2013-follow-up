@@ -21,6 +21,8 @@ class SemanticDict(object):
         self.solver = z3.Solver()
         self.root = None
 
+        self.cached_key = None
+
     def iter_nodes(self):
         def rec(node):
             if node.children is None:
@@ -39,24 +41,57 @@ class SemanticDict(object):
     def itervalues(self):
         return (node.value for node in self.iter_nodes())
 
-    @stats.TimeIt('SemanticDict.find_or_add')
-    def find_or_add(self, term, value_constructor):
+    def __contains__(self, key):
+        self.update_cache(key)
+        return self.cached_node is not None
+
+    def __getitem__(self, key):
+        self.update_cache(key)
+        if self.cached_node is None:
+            raise KeyError(key)
+        return self.cached_node.value
+
+    def __setitem__(self, key, value):
+        self.update_cache(key)
+        if self.cached_node is None:
+            self.cached_adder(value)
+
+            # TODO: make cached_adder return new node, and use it here to
+            # update cache instead of invalidating it.
+            self.cached_key = None
+        else:
+            self.cached_node.value = value
+
+    @stats.TimeIt('SemanticDict.update_cache')
+    def update_cache(self, term):
+        assert term is not None
+        if self.cached_key == term:
+            return
+
         if self.root is None:
-            self.root = Node()
-            self.root.term = term
-            self.root.value = value_constructor()
-            return self.root.value
+            def adder(value):
+                self.root = Node()
+                self.root.term = term
+                self.root.value = value
+            self.cached_key = term
+            self.cached_node = None
+            self.cached_adder = adder
+            return
 
         node = self.root
         while node.children is not None:
             env = dict(zip(self.vars, node.vars))
             v = evaluate(term, env)
             if v not in node.children:
-                leaf = Node()
-                leaf.term = term
-                leaf.value = value_constructor()
-                node.children[v] = leaf
-                return leaf.value
+                def adder(value):
+                    leaf = Node()
+                    leaf.term = term
+                    leaf.value = value
+                    node.children[v] = leaf
+                self.cached_key = term
+                self.cached_node = None
+                self.cached_adder = adder
+                return
 
             node = node.children[v]
 
@@ -66,26 +101,35 @@ class SemanticDict(object):
             z3t = z3_utils.term_to_z3(term, z3_utils.default_env)
             self.solver.add(node_z3t != z3t)
             result = self.solver.check()
+
         if result == z3.sat:
             model = self.solver.model()
-            leaf1 = copy(node)
-            leaf2 = Node()
-            leaf2.term = term
-            leaf2.value = value_constructor()
-            node.term = node.value = None
+            v1 = z3_utils.eval_in_model(model, node_z3t)
+            v2 = z3_utils.eval_in_model(model, z3t)
 
-            node.vars = [
-                z3_utils.eval_in_model(model, z3_utils.default_env[v])
-                for v in self.vars]
-            node.children = {}
+            def adder(value):
+                leaf1 = copy(node)
+                leaf2 = Node()
+                leaf2.term = term
+                leaf2.value = value
+                node.term = node.value = None
 
-            node.children[z3_utils.eval_in_model(model, node_z3t)] = leaf1
-            node.children[z3_utils.eval_in_model(model, z3t)] = leaf2
+                node.vars = [
+                    z3_utils.eval_in_model(model, z3_utils.default_env[v])
+                    for v in self.vars]
+                node.children = {}
 
-            return leaf2.value
+                node.children[v1] = leaf1
+                node.children[v2] = leaf2
+
+            self.cached_key = term
+            self.cached_node = None
+            self.cached_adder = adder
 
         elif result == z3.unsat:
-            return node.value
+            self.cached_key = term
+            self.cached_node = node
+            self.cached_adder = None
         else:
             assert False, result
 
@@ -119,6 +163,10 @@ if __name__ == '__main__':
         (AND, (SHL1, 1), 'x'),
     ]
     for i, t in enumerate(terms):
-        print d.find_or_add(t, lambda: i)
+        if t in d:
+            print d[t]
+        else:
+            d[t] = i
+            print i
 
     print d.to_str()

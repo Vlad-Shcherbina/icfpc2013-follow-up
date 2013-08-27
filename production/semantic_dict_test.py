@@ -23,7 +23,11 @@ def simple_test():
         (SHL1, 'x'),
     ]
     for i, t in enumerate(terms):
-        result.append(d.find_or_add(t, lambda: i))
+        if t in d:
+            result.append(d[t])
+        else:
+            d[t] = i
+            result.append(i)
     print d.to_str(),
 
     eq_(result, [0, 1, 0, 3, 0, 1, 6, 6])
@@ -51,7 +55,8 @@ def test_with_enum():
 
     d = SemanticDict()
     for t in all_terms:
-        d.find_or_add(t, lambda: t)
+        if t not in d:
+            d[t] = t
     print d.to_str()
 
     unique_terms = list(d.itervalues())

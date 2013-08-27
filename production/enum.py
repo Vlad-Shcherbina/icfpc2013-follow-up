@@ -101,10 +101,9 @@ class EnumUnique(Enum):
         for i in range(size+1):
             u = []
             for t in self.base_enum(i):
-                def add_to_u():
+                if t not in d:
+                    d[t] = t
                     u.append(t)
-                    return t
-                d.find_or_add(t, add_to_u)
             self.unique.append(u)
             logger.info('{} unique terms of size {}'.format(len(self.unique[i]), i))
 
