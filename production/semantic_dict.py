@@ -1,13 +1,15 @@
 from copy import copy
 
 import z3
+
+from terms import *
 import z3_utils
 import stats
 
 
 class Node(object):
     def __init__(self):
-        self.z3t = None
+        self.term = None
         self.value = None
         self.vars = None
         self.children = None
@@ -37,61 +39,48 @@ class SemanticDict(object):
     def itervalues(self):
         return (node.value for node in self.iter_nodes())
 
-    @staticmethod
-    def _make_z3_evaluator(z3t):
-        def evaluator(env):
-            solver = z3.Solver()
-            for k, v in env.items():
-                solver.add(z3.BitVec(k, 64) == v)
-            result = solver.check()
-            assert result == z3.sat
-            model = solver.model()
-            return z3_utils.eval_in_model(model, z3t)
-        return evaluator
-
     @stats.TimeIt('SemanticDict.find_or_add')
-    def find_or_add(self, z3t, value_constructor, evaluator=None):
+    def find_or_add(self, term, value_constructor):
         if self.root is None:
             self.root = Node()
-            self.root.z3t = z3t
+            self.root.term = term
             self.root.value = value_constructor()
             return self.root.value
-
-        if evaluator is None:
-            evaluator = self._make_z3_evaluator(z3t)
 
         node = self.root
         while node.children is not None:
             env = dict(zip(self.vars, node.vars))
-            t = evaluator(env)
-            if t not in node.children:
+            v = evaluate(term, env)
+            if v not in node.children:
                 leaf = Node()
-                leaf.z3t = z3t
+                leaf.term = term
                 leaf.value = value_constructor()
-                node.children[t] = leaf
+                node.children[v] = leaf
                 return leaf.value
 
-            node = node.children[t]
+            node = node.children[v]
 
         self.solver.reset()
         with stats.TimeIt('equivalence check'):
-            self.solver.add(node.z3t != z3t)
+            node_z3t = z3_utils.term_to_z3(node.term, z3_utils.default_env)
+            z3t = z3_utils.term_to_z3(term, z3_utils.default_env)
+            self.solver.add(node_z3t != z3t)
             result = self.solver.check()
         if result == z3.sat:
             model = self.solver.model()
             leaf1 = copy(node)
             leaf2 = Node()
-            leaf2.z3t = z3t
+            leaf2.term = term
             leaf2.value = value_constructor()
-            node.z3t = node.value = None
+            node.term = node.value = None
 
             node.vars = [
-                z3_utils.eval_in_model(model, z3.BitVec(v, 64))
+                z3_utils.eval_in_model(model, z3_utils.default_env[v])
                 for v in self.vars]
             node.children = {}
 
-            node.children[z3_utils.eval_in_model(model, leaf1.z3t)] = leaf1
-            node.children[z3_utils.eval_in_model(model, leaf2.z3t)] = leaf2
+            node.children[z3_utils.eval_in_model(model, node_z3t)] = leaf1
+            node.children[z3_utils.eval_in_model(model, z3t)] = leaf2
 
             return leaf2.value
 
@@ -107,7 +96,7 @@ class SemanticDict(object):
         def rec(node, indent=''):
             if node.children is None:
                 result.append(
-                    '{}: {}\n'.format(node.z3t, value_to_str(node.value)))
+                    '{}: {}\n'.format(node.term, value_to_str(node.value)))
                 return
             env = ', '.join(
                 '{}=0x{:x}'.format(var, value)
@@ -123,8 +112,13 @@ class SemanticDict(object):
 
 if __name__ == '__main__':
     d = SemanticDict()
-    x = z3.BitVec('x', 64)
-    for i, z3t in enumerate([x, x&1, x+0, 2&x]):
-        print d.find_or_add(z3t, lambda: i)
+    terms = [
+        'x',
+        (AND, 'x', 1),
+        (PLUS, 'x', 0),
+        (AND, (SHL1, 1), 'x'),
+    ]
+    for i, t in enumerate(terms):
+        print d.find_or_add(t, lambda: i)
 
     print d.to_str()

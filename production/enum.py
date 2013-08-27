@@ -2,7 +2,6 @@ from terms import *
 from constraints import Constraint, filter_with_constraint
 from constraints import propagate_unary, propagate_binary1, propagate_binary2
 from semantic_dict import SemanticDict
-from z3_utils import term_to_z3, default_env
 import stats
 
 import logging
@@ -102,13 +101,10 @@ class EnumUnique(Enum):
         for i in range(size+1):
             u = []
             for t in self.base_enum(i):
-                zt = term_to_z3(t, default_env)
                 def add_to_u():
                     u.append(t)
                     return t
-                def evaluator(env):
-                    return evaluate(t, env)
-                d.find_or_add(zt, add_to_u, evaluator=evaluator)
+                d.find_or_add(t, add_to_u)
             self.unique.append(u)
             logger.info('{} unique terms of size {}'.format(len(self.unique[i]), i))
 

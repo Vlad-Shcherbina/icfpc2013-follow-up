@@ -11,13 +11,22 @@ from z3_utils import term_to_z3, default_env
 
 def simple_test():
     d = SemanticDict()
-    x = z3.BitVec('x', 64)
     result = []
-    for i, z3t in enumerate([x, x&1, x+0, 2&x, x, x%2, x+x]):
-        result.append(d.find_or_add(z3t, lambda: i))
+    terms = [
+        'x',
+        (AND, 'x', 1),
+        (PLUS, 'x', 0),
+        (AND, (SHL1, 1), 'x'),
+        'x',
+        (AND, 1, 'x'),
+        (PLUS, 'x', 'x'),
+        (SHL1, 'x'),
+    ]
+    for i, t in enumerate(terms):
+        result.append(d.find_or_add(t, lambda: i))
     print d.to_str(),
 
-    eq_(result, [0, 1, 0, 3, 0, 1, 6])
+    eq_(result, [0, 1, 0, 3, 0, 1, 6, 6])
 
 
 def terms_equivalent(t1, t2):
@@ -42,8 +51,7 @@ def test_with_enum():
 
     d = SemanticDict()
     for t in all_terms:
-        z3t = term_to_z3(t, default_env)
-        d.find_or_add(z3t, lambda: t)
+        d.find_or_add(t, lambda: t)
     print d.to_str()
 
     unique_terms = list(d.itervalues())
