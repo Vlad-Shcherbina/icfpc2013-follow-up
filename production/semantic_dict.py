@@ -139,8 +139,9 @@ class SemanticDict(object):
         result = []
         def rec(node, indent=''):
             if node.children is None:
-                result.append(
-                    '{}: {}\n'.format(node.term, value_to_str(node.value)))
+                result.append('{}: {}\n'.format(
+                    term_to_str(node.term),
+                    value_to_str(node.value)))
                 return
             env = ', '.join(
                 '{}=0x{:x}'.format(var, value)
