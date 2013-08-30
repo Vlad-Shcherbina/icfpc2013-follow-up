@@ -1,4 +1,6 @@
 import itertools
+import cPickle as pickle
+import os
 
 from terms import *
 from semantic_dict import SemanticDict
@@ -125,6 +127,28 @@ class UniqueDB(object):
         return 'Complete for {}\n{}'.format(self.complete_for, self.by_function.to_str())
 
 
+FILENAME = '../data/unique_db.pickle'
+
 @cached
 def get_db():
+    if os.path.exists(FILENAME):
+        logger.info('loading {}'.format(FILENAME))
+        with open(FILENAME, 'rb') as fin:
+            return pickle.load(fin)
     return UniqueDB()
+
+
+def save_db():
+    db = get_db()
+    db.by_function.clear_cache()
+    logger.info('saving {}'.format(FILENAME))
+    with open(FILENAME, 'wb') as fout:
+        pickle.dump(db, fout, protocol=2)
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    db = get_db()
+
+    print db.to_str()
+    print len(db.by_function), 'unique terms'

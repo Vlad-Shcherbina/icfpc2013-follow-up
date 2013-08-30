@@ -15,13 +15,14 @@ class Node(object):
         self.children = None
 
 
+solver = z3.Solver()
+
+
 class SemanticDict(object):
     def __init__(self):
         self.vars = ['x', 'y', 'z']
-        self.solver = z3.Solver()
         self.root = None
-
-        self.cached_key = None
+        self.clear_cache()
 
     def iter_nodes(self):
         def rec(node):
@@ -58,9 +59,14 @@ class SemanticDict(object):
 
             # TODO: make cached_adder return new node, and use it here to
             # update cache instead of invalidating it.
-            self.cached_key = None
+            self.clear_cache()
         else:
             self.cached_node.value = value
+
+    def clear_cache(self):
+        self.cached_key = None
+        self.cached_node = None
+        self.cached_adder = None
 
     @stats.TimeIt('SemanticDict.update_cache')
     def update_cache(self, term):
@@ -98,15 +104,15 @@ class SemanticDict(object):
         if term == node.term:
             result = z3.unsat
         else:
-            self.solver.reset()
+            solver.reset()
             with stats.TimeIt('equivalence check'):
                 node_z3t = z3_utils.term_to_z3(node.term, z3_utils.default_env)
                 z3t = z3_utils.term_to_z3(term, z3_utils.default_env)
-                self.solver.add(node_z3t != z3t)
-                result = self.solver.check()
+                solver.add(node_z3t != z3t)
+                result = solver.check()
 
         if result == z3.sat:
-            model = self.solver.model()
+            model = solver.model()
             v1 = z3_utils.eval_in_model(model, node_z3t)
             v2 = z3_utils.eval_in_model(model, z3t)
 
