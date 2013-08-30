@@ -32,7 +32,9 @@ class Constraint(Constraint):
 
 
 def filter_with_constraint(terms, constraints):
-    return [t for t in terms if all(c.term_satisfies(t) for c in constraints)]
+    for t in terms:
+        if all(c.term_satisfies(t) for c in constraints):
+            yield t
 
 
 RIGHT_SHIFTS = {SHR1:1, SHR4:4, SHR16:16}

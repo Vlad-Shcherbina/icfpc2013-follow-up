@@ -5,6 +5,7 @@ from random import randrange
 from terms import *
 from enum import EnumUnique, Constraint
 import stats
+import unique_db
 
 import logging
 logger = logging.getLogger(__name__)
@@ -40,12 +41,22 @@ def get_new_points(n, known_values):
     return xs
 
 
+def complete_db_for(size, operators):
+    db = unique_db.get_db()
+    e = EnumUnique(operators)
+    for i in range(1, size+1):
+        shape = unique_db.Shape(i, operators)
+        if not db.is_complete_for(shape):
+            db.complete(shape, e.base_enum(i))
+    logger.info('unique_db size = {}'.format(len(db.by_function)))
+
+
 def solve(problem, server):
     assert 'fold' not in problem.operators
     assert 'tfold' not in problem.operators
 
     e = EnumUnique(problem.operators)
-    e.precompute_unique(3)
+    complete_db_for(3, problem.operators)
 
     known_values = {}
     while True:
@@ -64,6 +75,7 @@ def solve(problem, server):
             for candidate in candidates:
                 for x, y in known_values.items():
                     if evaluate(candidate, dict(x=x)) != y:
+                        break
                         assert False, ('constraints not satisfied by enum', candidate)
                 else:
                     break

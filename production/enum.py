@@ -2,6 +2,7 @@ from terms import *
 from constraints import Constraint, filter_with_constraint
 from constraints import propagate_unary, propagate_binary1, propagate_binary2
 from semantic_dict import SemanticDict
+import unique_db
 import stats
 
 import logging
@@ -94,24 +95,17 @@ class Enum(object):
 class EnumUnique(Enum):
     def __init__(self, operators):
         super(EnumUnique, self).__init__(operators)
-
-    def precompute_unique(self, size):
-        self.unique = []
-        d = SemanticDict()
-        for i in range(size+1):
-            u = []
-            for t in self.base_enum(i):
-                if t not in d:
-                    d[t] = t
-                    u.append(t)
-            self.unique.append(u)
-            logger.info('{} unique terms of size {}'.format(len(self.unique[i]), i))
+        self.operators = operators
 
     def base_enum(self, size, constraints=[]):
-        if size < 0:
+        if size <= 0:
             return []
-        if size < len(self.unique):
-            return filter_with_constraint(self.unique[size], constraints)
+        db = unique_db.get_db()
+        if db.is_complete_for(unique_db.Shape(size, self.operators)):
+            return filter_with_constraint(
+                db.get_unique_terms(size, self.operators),
+                constraints)
+
         return super(EnumUnique, self).base_enum(size, constraints)
 
 

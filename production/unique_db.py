@@ -2,6 +2,11 @@ import itertools
 
 from terms import *
 from semantic_dict import SemanticDict
+from utils import cached
+import stats
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 ALL_OPS = UNARY_OPS + BINARY_OPS + [IF0]
@@ -87,6 +92,7 @@ class UniqueDB(object):
         return result
 
     def complete(self, shape, all_terms):
+        logger.info('completing for {}'.format(shape))
         assert not self.is_complete_for(shape)
         assert self.is_complete_for(Shape(shape.size-1, shape.get_ops()))
         for term in all_terms:
@@ -99,8 +105,9 @@ class UniqueDB(object):
             if term_size(term) < term_size(e.minimal_implementation):
                 e.minimal_implementation = term
 
-            for s in self.get_possible_shapes(term):
-                e.add_possible_shape(s)
+            with stats.TimeIt('update possible shapes'):
+                for s in self.get_possible_shapes(term):
+                    e.add_possible_shape(s)
 
         self.complete_for = [
             s for s in self.complete_for
@@ -116,3 +123,8 @@ class UniqueDB(object):
 
     def to_str(self):
         return 'Complete for {}\n{}'.format(self.complete_for, self.by_function.to_str())
+
+
+@cached
+def get_db():
+    return UniqueDB()

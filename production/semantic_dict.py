@@ -95,12 +95,15 @@ class SemanticDict(object):
 
             node = node.children[v]
 
-        self.solver.reset()
-        with stats.TimeIt('equivalence check'):
-            node_z3t = z3_utils.term_to_z3(node.term, z3_utils.default_env)
-            z3t = z3_utils.term_to_z3(term, z3_utils.default_env)
-            self.solver.add(node_z3t != z3t)
-            result = self.solver.check()
+        if term == node.term:
+            result = z3.unsat
+        else:
+            self.solver.reset()
+            with stats.TimeIt('equivalence check'):
+                node_z3t = z3_utils.term_to_z3(node.term, z3_utils.default_env)
+                z3t = z3_utils.term_to_z3(term, z3_utils.default_env)
+                self.solver.add(node_z3t != z3t)
+                result = self.solver.check()
 
         if result == z3.sat:
             model = self.solver.model()
