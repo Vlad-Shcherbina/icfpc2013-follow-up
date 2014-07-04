@@ -23,7 +23,7 @@ class CounterStat(object):
 
 def float_to_str(x, precision=1):
     '''
-    Convert float to string with at least precision significant digits.
+    Convert float to string with at least `precision` significant digits.
 
     >>> float_to_str(0.123, 2)
     '0.12'
@@ -37,7 +37,7 @@ def float_to_str(x, precision=1):
     >>> float_to_str(123.45, 2)
     '123.5'
 
-    Trailing zeroes, except the last one, are removed:
+    Trailing zeroes, except the one immediately following decimal point, are removed:
     >>> float_to_str(0, 5)
     '0.0'
     >>> float_to_str(0.12, 5)
